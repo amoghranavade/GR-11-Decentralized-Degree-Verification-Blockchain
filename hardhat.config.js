@@ -10,7 +10,7 @@ module.exports = {
   },
   networks: {
     amoy: {
-      url: AMOY_RPC_URL || "https://polygon-amoy.drpc.org",
+      url: AMOY_RPC_URL || "https://rpc-amoy.polygon.technology/",
       chainId: 80002,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
