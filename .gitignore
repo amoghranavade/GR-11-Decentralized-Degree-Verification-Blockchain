@@ -5,4 +5,6 @@ artifacts/
 typechain-types/
 coverage/
 coverage.json
+frontend/dist/
+frontend/public/deployment.json
 .DS_Store
