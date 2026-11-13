@@ -1,45 +1,43 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
+const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { deploySystem, registerStudent } = require("./helpers/deploySystem");
 
 describe("Credential flow", function () {
-  async function deployAll() {
-    const [admin, university, student, employer] = await ethers.getSigners();
-
-    const accessControl = await ethers.deployContract("IssuerAccessControl", [admin.address]);
-    const didRegistry = await ethers.deployContract("DIDRegistry");
-    const auditLog = await ethers.deployContract("VerificationLog");
-    const credentialStatus = await ethers.deployContract("CredentialStatus", [
-      await accessControl.getAddress(),
-      await didRegistry.getAddress(),
-      await auditLog.getAddress(),
-    ]);
-
-    await auditLog.setWriter(await credentialStatus.getAddress());
+  async function deployReadySystem() {
+    const system = await deploySystem();
+    const { accessControl, didRegistry, university, student } = system;
     await accessControl.addIssuer(university.address);
-    await didRegistry
-      .connect(student)
-      .registerDID(ethers.id("student DID document"), "ipfs://student-did-document");
-
-    return { credentialStatus, auditLog, university, student, employer };
+    await registerStudent(didRegistry, student);
+    return system;
   }
 
   it("issues, verifies and revokes a credential", async function () {
-    const { credentialStatus, auditLog, university, student, employer } = await deployAll();
+    const { credentialStatus, auditLog, university, student, employer } =
+      await loadFixture(deployReadySystem);
     const credentialHash = ethers.id("signed degree credential");
 
-    await credentialStatus.connect(university).issueCredential(credentialHash, student.address);
+    await expect(
+      credentialStatus.connect(university).issueCredential(credentialHash, student.address)
+    )
+      .to.emit(auditLog, "CredentialIssued")
+      .withArgs(credentialHash, university.address, student.address, anyValue);
     expect(await credentialStatus.isValid(credentialHash)).to.equal(true);
 
-    await credentialStatus.connect(university).revokeCredential(credentialHash);
+    await expect(credentialStatus.connect(university).revokeCredential(credentialHash))
+      .to.emit(auditLog, "CredentialRevoked")
+      .withArgs(credentialHash, university.address, anyValue);
     expect(await credentialStatus.isRevoked(credentialHash)).to.equal(true);
     expect(await credentialStatus.isValid(credentialHash)).to.equal(false);
 
     await expect(credentialStatus.connect(employer).verifyAndLog(credentialHash))
-      .to.emit(auditLog, "CredentialVerified");
+      .to.emit(auditLog, "CredentialVerified")
+      .withArgs(credentialHash, employer.address, false, anyValue);
   });
 
   it("blocks accounts that are not approved issuers", async function () {
-    const { credentialStatus, student } = await deployAll();
+    const { credentialStatus, student } = await loadFixture(deployReadySystem);
 
     await expect(
       credentialStatus.connect(student).issueCredential(ethers.id("fake degree"), student.address)
