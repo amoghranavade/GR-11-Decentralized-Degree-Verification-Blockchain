@@ -12,7 +12,7 @@ We are building a dApp where:
 - **Universities (issuers)** record a hash of each credential on the blockchain and can revoke it later.
 - **Employers or other schools (verifiers)** can check a credential at any time without contacting the university.
 
-No personal data goes on-chain. The blockchain only stores hashes, roles and a revocation bit for each credential. The actual credential stays with the student, with an encrypted backup on IPFS.
+No personal data goes on-chain. The blockchain only stores hashes, roles and a revocation bit for each credential. The actual credential remains off-chain; encrypted IPFS backup is planned for the final milestone.
 
 ![Architecture](docs/architecture.png)
 
@@ -45,21 +45,22 @@ contracts/
   CredentialStatus.sol
   VerificationLog.sol
 scripts/deploy.js   deploys all four contracts and links them
-test/               Hardhat tests
-frontend/           React app (planned)
+scripts/demo.js     runs the complete stakeholder workflow
+test/               integration and contract tests
+frontend/           React, Ethers.js and MetaMask demo
 offchain/           credential signing, selective disclosure, IPFS (planned)
-zkp/                zero-knowledge proof demo (planned)
 docs/               architecture diagram
 ```
 
 ## Setup
 
-You need **Node.js 18 or newer** and **npm**. MetaMask is only needed for the testnet deployment.
+You need **Node.js 18 or newer** and **npm**. MetaMask is needed for the browser workflow but not for the terminal demo or tests.
 
 ```bash
 git clone https://github.com/amoghranavade/GR-11-Decentralized-Degree-Verification-Blockchain.git
 cd GR-11-Decentralized-Degree-Verification-Blockchain
 npm install
+npm run frontend:install
 ```
 
 Main dependencies:
@@ -67,6 +68,7 @@ Main dependencies:
 - Hardhat (compile, test, deploy)
 - OpenZeppelin Contracts (`AccessControl`)
 - dotenv (reads the RPC URL and private key from `.env`)
+- React, Ethers.js and Vite (frontend)
 
 ## Compile and test
 
@@ -75,32 +77,69 @@ npx hardhat compile
 npx hardhat test
 ```
 
-## Deploy
+## Interim stakeholder demo
 
-**Local Hardhat network** (no wallet or test tokens needed):
+Run the deterministic terminal demo without MetaMask or a separate blockchain process:
 
 ```bash
-npx hardhat node
-# in a second terminal
-npx hardhat run scripts/deploy.js --network localhost
+npm run demo
 ```
+
+It deploys the contracts on an ephemeral Hardhat network and demonstrates:
+
+1. The administrator approves a university.
+2. A student registers an active DID.
+3. The university issues a credential.
+4. An employer verifies the credential as valid.
+5. Unauthorized issuance is rejected.
+6. The university revokes the credential.
+7. The employer verifies the credential as invalid.
+
+The script exits with an error if any expected result or verification event is missing.
+
+## Deploy
+
+**Local Hardhat network and frontend:**
+
+```bash
+npm run node
+```
+
+In a second terminal:
+
+```bash
+npm run deploy:local
+```
+
+The deployment writes contract addresses and ABIs to the frontend configuration. In a third terminal:
+
+```bash
+npm run frontend
+```
+
+Connect MetaMask to `http://127.0.0.1:8545` with chain ID `31337`. Use only the local test accounts printed by Hardhat. Switch between administrator, university, student and employer accounts as the workflow moves between stakeholders.
 
 **Polygon Amoy testnet:**
 
+Amoy does not require a separate Polygon account. Use dedicated test-only MetaMask wallets and never reuse wallets that hold real assets. One funded wallet is enough to deploy. For the complete stakeholder workflow, the administrator, university and student wallets need test POL, and the employer wallet also needs test POL when calling `verifyAndLog()`.
+
 1. Copy `.env.example` to `.env`.
-2. Add an Amoy RPC URL and the private key of a **test wallet only**.
-3. Get free test POL from a Polygon Amoy faucet.
-4. Run:
+2. Set `AMOY_RPC_URL` and the private key of the dedicated test wallet.
+3. Add Polygon Amoy to MetaMask using chain ID `80002` and currency `POL`.
+4. Get test POL from the [Polygon faucet](https://faucet.polygon.technology/).
+5. Run:
 
 ```bash
-npx hardhat run scripts/deploy.js --network amoy
+npm run deploy:amoy
 ```
 
-The script prints the address of each contract. Never commit your `.env` file.
+The script prints each contract address and updates the frontend deployment configuration. A Polygonscan account is not needed for deployment. Never commit `.env` or a private key.
 
 ## Current status
 
-This is the draft design for the Smart Contract Design milestone. The contract interfaces and core logic are in place and the basic tests pass. Next we plan to add more tests and gas measurements, build the frontend, and add the off-chain signing, IPFS storage and ZKP demo.
+The smart contracts, interfaces, local deployment, stakeholder demo and initial React/MetaMask integration are implemented. The interim workflow covers issuer approval, DID registration, credential issuance, verification, revocation and audit events.
+
+Work still in progress includes off-chain W3C credential signing, selective disclosure, encrypted IPFS storage, the ZKP demo, Amoy deployment evidence, gas measurements and the final scalability and privacy analysis.
 
 ## Team
 
